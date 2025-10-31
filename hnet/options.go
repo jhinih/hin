@@ -1,5 +1,7 @@
 package hnet
 
+import "github.com/jhinih/hin/hinterface"
+
 // Options for Server
 // (Server的服务Option)
 type Option func(s *Server)
@@ -13,8 +15,9 @@ type Option func(s *Server)
 //	}
 //}
 
-//// Options for Client
-//type ClientOption func(c hinterface.IClient)
+// Options for Client
+type ClientOption func(c hinterface.IClient)
+
 //
 //// Implement custom data packet format by implementing the Packet interface for client,
 //// otherwise use the default data packet format
