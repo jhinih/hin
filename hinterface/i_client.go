@@ -30,7 +30,7 @@ type IClient interface {
 
 	// GetMsgHandler Get the message handling module bound to this Client
 	// (获取Client绑定的消息处理模块)
-	GetMsgHandler() IMsgHandle
+	GetMsgHandler() IMessageHandler
 
 	// Get the error channel for this Client 获取客户端错误管道
 	GetErrChan() <-chan error
