@@ -12,7 +12,9 @@ import (
 )
 
 type Connection struct {
-	Conn     *net.TCPConn
+	Name string
+
+	Conn     net.Conn
 	ConnID   uint32
 	isClosed bool
 
@@ -22,40 +24,79 @@ type Connection struct {
 
 	MsgHandler hinterface.IMessageHandler
 
-	TcpServer hinterface.IServer
-
 	property     map[string]interface{}
 	propertyLock sync.RWMutex
+
+	Pack hinterface.IPack
+
+	ConnectionStartHook func(hinterface.IConnection)
+	ConnectionStopHook  func(hinterface.IConnection)
+	ConnectionManager   hinterface.IConnectionManager
+
+	localAddr  string
+	remoteAddr string
 }
 
-func NewConnection(server hinterface.IServer, conn *net.TCPConn, connID uint32, MsgHandler hinterface.IMessageHandler) *Connection {
-	return &Connection{
+func NewServerConnection(server hinterface.IServer, conn net.Conn, connID uint32, MsgHandler hinterface.IMessageHandler) *Connection {
+	c := &Connection{
+		Name:           server.GetName(),
 		Conn:           conn,
 		ConnID:         connID,
 		isClosed:       false,
 		ExitChan:       make(chan bool, 1),
 		read2WriteChan: make(chan []byte, 1),
-		MsgHandler:     MsgHandler,
-		TcpServer:      server,
 		property:       make(map[string]interface{}),
+
+		localAddr:  conn.LocalAddr().String(),
+		remoteAddr: conn.RemoteAddr().String(),
 	}
+
+	c.Pack = server.GetPack()
+	c.ConnectionManager = server.GetConnectionManager()
+	c.MsgHandler = server.GetMsgHandler()
+	c.ConnectionStartHook = server.GetConnectionStartHook()
+	c.ConnectionStopHook = server.GetConnectionStopHook()
+
+	c.ConnectionManager.Add(c)
+	fmt.Println("[connection number " + strconv.Itoa(c.ConnectionManager.Len()) + "]")
+
+	return c
+}
+func NewClientConnection(client hinterface.IClient, conn net.Conn) *Connection {
+	c := &Connection{
+		Name:           client.GetName(),
+		Conn:           conn,
+		ConnID:         0,
+		isClosed:       false,
+		ExitChan:       make(chan bool, 1),
+		read2WriteChan: make(chan []byte, 1),
+		property:       make(map[string]interface{}),
+
+		localAddr:  conn.LocalAddr().String(),
+		remoteAddr: conn.RemoteAddr().String(),
+	}
+
+	c.Pack = client.GetPack()
+	c.MsgHandler = client.GetMsgHandler()
+	c.ConnectionStartHook = client.GetConnectionStartHook()
+	c.ConnectionStopHook = client.GetConnectionStartHook()
+
+	return c
 }
 func (c *Connection) StartReader() {
-	fmt.Println("[client", c.RemoteAddress().String(), "conn start reader]")
+	fmt.Println("[client", c.localAddr, "conn start reader]")
 	defer fmt.Println("[client", c.RemoteAddress().String(), "conn reader exit]")
 	defer c.Stop()
 
 	for {
-		p := hpack.NewTLVPack()
-
-		head := make([]byte, p.GetHeadLen())
+		head := make([]byte, c.Pack.GetHeadLen())
 		_, err := io.ReadFull(c.Conn, head)
 		if err != nil {
 			fmt.Println("read head err:", err)
 			break
 		}
 
-		msgHandler, err := p.UnPack(head)
+		msgHandler, err := c.Pack.UnPack(head)
 		if err != nil {
 			fmt.Println("unpack err:", err)
 			break
@@ -99,16 +140,14 @@ func (c *Connection) StartWriter() {
 }
 
 func (c *Connection) Start() {
-	c.TcpServer.GetConnectionManagerHandler().Add(c)
-	fmt.Println("[connection number " + strconv.Itoa(c.TcpServer.GetConnectionManagerHandler().Len()) + "]")
 	fmt.Println("[connection", strconv.Itoa(int(c.ConnID)), "start]")
 	go c.StartReader()
 	go c.StartWriter()
-	c.TcpServer.CallConnectionStartHook(c)
+	c.ConnectionStartHook(c)
 }
 func (c *Connection) Stop() {
-	c.TcpServer.CallConnectionStopHook(c)
-	c.TcpServer.GetConnectionManagerHandler().Remove(c)
+	c.ConnectionStopHook(c)
+	c.ConnectionManager.Remove(c)
 	fmt.Println("[connection", strconv.Itoa(int(c.ConnID)), "stop]")
 	if c.isClosed == true {
 		return
@@ -120,7 +159,10 @@ func (c *Connection) Stop() {
 	close(c.ExitChan)
 	close(c.read2WriteChan)
 }
-func (c *Connection) GetTCpConnection() *net.TCPConn {
+func (c *Connection) GetTCPConnection() *net.TCPConn {
+	return c.Conn.(*net.TCPConn)
+}
+func (c *Connection) GetConnection() net.Conn {
 	return c.Conn
 }
 func (c *Connection) GetConnectionID() uint32 {
@@ -135,9 +177,8 @@ func (c *Connection) Send(msgID uint32, data []byte) error {
 		return errors.New("connection " + strconv.Itoa(int(c.ConnID)) + " is closed")
 	}
 
-	p := hpack.NewTLVPack()
 	msg := hpack.NewMessage(msgID, data)
-	binaryMsg, err := p.Pack(msg)
+	binaryMsg, err := c.Pack.Pack(msg)
 	if err != nil {
 		return errors.New("pack err")
 	}

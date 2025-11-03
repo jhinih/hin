@@ -3,6 +3,7 @@ package hnet
 import (
 	"fmt"
 	"github.com/jhinih/hin/hinterface"
+	"github.com/jhinih/hin/hpack"
 	"net"
 )
 
@@ -15,19 +16,24 @@ type Server struct {
 	MsgHandler        hinterface.IMessageHandler
 	ConnectionManager hinterface.IConnectionManager
 
-	exitChan        chan any
-	ConnectionStart func(hinterface.IConnection)
-	ConnectionStop  func(hinterface.IConnection)
+	exitChan            chan any
+	ConnectionStartHook func(hinterface.IConnection)
+	ConnectionStopHook  func(hinterface.IConnection)
+
+	Pack hinterface.IPack
 }
 
 func NewServer() hinterface.IServer {
 	return &Server{
-		IPVersion:         "tcp4",
-		IP:                "127.0.0.1",
-		Port:              8999,
-		Name:              "hnet",
-		MsgHandler:        NewMessageHandler(),
-		ConnectionManager: NewConnectionManager(),
+		Name:      "HinServer",
+		IPVersion: "tcp4",
+		IP:        "0.0.0.0",
+		Port:      8999,
+
+		MsgHandler:        NewServerMessageHandler(),
+		ConnectionManager: NewServerConnectionManager(),
+
+		Pack: hpack.NewLTVPack(),
 	}
 }
 
@@ -55,7 +61,7 @@ func (s *Server) Start() {
 				conn.Close()
 				continue
 			}
-			dealConn := NewConnection(s, conn, cid, s.MsgHandler)
+			dealConn := NewServerConnection(s, conn, cid, s.MsgHandler)
 			cid++
 
 			go dealConn.Start()
@@ -69,7 +75,7 @@ func (s *Server) Stop() {
 	s.exitChan <- struct{}{}
 	close(s.exitChan)
 }
-func (s *Server) Server() {
+func (s *Server) Serve() {
 	s.Start()
 
 	select {}
@@ -79,27 +85,32 @@ func (s *Server) AddRouter(msgID uint32, router hinterface.IRouter) {
 	s.MsgHandler.AddRouter(msgID, router)
 }
 
-func (s *Server) GetConnectionManagerHandler() hinterface.IConnectionManager {
-	return s.ConnectionManager
-}
-
 func (s *Server) SetConnectionStartHook(fn func(hinterface.IConnection)) {
-	s.ConnectionStart = fn
+	s.ConnectionStartHook = fn
 }
 func (s *Server) SetConnectionStopHook(fn func(hinterface.IConnection)) {
-	s.ConnectionStop = fn
+	s.ConnectionStopHook = fn
 }
-func (s *Server) CallConnectionStartHook(connection hinterface.IConnection) {
-	if s.ConnectionStart != nil {
-		fmt.Println("call——————>connection start hook")
-		s.ConnectionStart(connection)
-	}
+func (s *Server) GetPack() hinterface.IPack {
+	return s.Pack
+}
+func (s *Server) SetPack(pack hinterface.IPack) {
+	s.Pack = pack
+}
+func (s *Server) GetConnectionStartHook() func(hinterface.IConnection) {
+	return s.ConnectionStartHook
+}
+func (s *Server) GetConnectionStopHook() func(hinterface.IConnection) {
+	return s.ConnectionStopHook
+}
+func (s *Server) GetMsgHandler() hinterface.IMessageHandler {
+	return s.MsgHandler
+}
+func (s *Server) GetConnectionManager() hinterface.IConnectionManager {
+	return s.ConnectionManager
+}
+func (s *Server) GetName() string {
+	return s.Name
+}
 
-}
-func (s *Server) CallConnectionStopHook(connection hinterface.IConnection) {
-	if s.ConnectionStop != nil {
-		fmt.Println("call——————>connection stop hook")
-		s.ConnectionStop(connection)
-	}
-
-}
+func init() {}

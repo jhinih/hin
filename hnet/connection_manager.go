@@ -13,7 +13,12 @@ type ConnectionManager struct {
 	Lock        sync.RWMutex
 }
 
-func NewConnectionManager() *ConnectionManager {
+func NewServerConnectionManager() *ConnectionManager {
+	return &ConnectionManager{
+		Connections: make(map[uint32]hinterface.IConnection),
+	}
+}
+func NewClientConnectionManager() *ConnectionManager {
 	return &ConnectionManager{
 		Connections: make(map[uint32]hinterface.IConnection),
 	}

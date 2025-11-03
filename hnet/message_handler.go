@@ -13,7 +13,14 @@ type MessageHandler struct {
 	TaskChan     []chan hinterface.IRequest
 }
 
-func NewMessageHandler() *MessageHandler {
+func NewServerMessageHandler() *MessageHandler {
+	return &MessageHandler{
+		APIs:         make(map[uint32]hinterface.IRouter),
+		WorkPollSize: 10,
+		TaskChan:     make([]chan hinterface.IRequest, 1024),
+	}
+}
+func NewClientMessageHandler() *MessageHandler {
 	return &MessageHandler{
 		APIs:         make(map[uint32]hinterface.IRouter),
 		WorkPollSize: 10,
@@ -50,8 +57,8 @@ func (m *MessageHandler) StartWorker(workerID int, taskChan chan hinterface.IReq
 	for {
 		select {
 		case request := <-taskChan:
-			m.DoMessageHandler(request)
 
+			m.DoMessageHandler(request)
 		}
 	}
 }

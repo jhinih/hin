@@ -1,11 +1,14 @@
 package hinterface
 
-import "net"
+import (
+	"net"
+)
 
 type IConnection interface {
 	Start()
 	Stop()
-	GetTCpConnection() *net.TCPConn
+	GetTCPConnection() *net.TCPConn
+	GetConnection() net.Conn
 	GetConnectionID() uint32
 	// RemoteAddress 远程客户端IP
 	RemoteAddress() net.Addr
@@ -16,5 +19,3 @@ type IConnection interface {
 	GetProperty(key string) (interface{}, error)
 	RemoveProperty(key string)
 }
-
-type HandlerFunc func(*net.TCPConn, []byte, int) error

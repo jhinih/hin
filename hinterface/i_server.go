@@ -3,14 +3,18 @@ package hinterface
 type IServer interface {
 	Start()
 	Stop()
-	Server()
+	Serve()
+	GetName() string
 
 	AddRouter(uint32, IRouter)
-	GetConnectionManagerHandler() IConnectionManager
 
 	SetConnectionStartHook(func(IConnection))
 	SetConnectionStopHook(func(IConnection))
+	GetConnectionStartHook() func(IConnection)
+	GetConnectionStopHook() func(IConnection)
 
-	CallConnectionStartHook(IConnection)
-	CallConnectionStopHook(IConnection)
+	GetPack() IPack
+	SetPack(IPack)
+	GetMsgHandler() IMessageHandler
+	GetConnectionManager() IConnectionManager
 }
