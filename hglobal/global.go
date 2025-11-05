@@ -16,7 +16,7 @@ var (
 	DB     *gorm.DB
 	Rdb    *redis.Client
 	Config *hconfig.Config
-	////MQ       *amqp.Connection
+	//MQ       *amqp.Connection
 	RabbitMQ mq.MQ
 	ESClient *elasticsearch.Client
 

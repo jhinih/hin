@@ -2,6 +2,7 @@ package log
 
 import (
 	"github.com/jhinih/hin/hconfig"
+	"github.com/jhinih/hin/hglobal"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -19,39 +20,39 @@ func GetZap(config *hconfig.Config) *zap.Logger {
 	if config == nil {
 		config = new(hconfig.Config)
 	}
-	//switch config.App.Env {
-	//case "pro":
-	//	//本开发模式旨在将正常信息及以上的log记录在文件中，方便查看
-	//	fileInfoCore := newZapConfig().
-	//		setEncoder(false, zapcore.NewConsoleEncoder).
-	//		setFileWriteSyncer(hglobal.Path + config.App.LogfilePath + "info.log").
-	//		setLevelEnabler(zapcore.DebugLevel).
-	//		getCore()
-	//	//本开发模式旨在将error及以上的log记录在文件中，方便查看
-	//	fileErrorCore := newZapConfig().
-	//		setEncoder(false, zapcore.NewConsoleEncoder).
-	//		setFileWriteSyncer(hglobal.Path + config.App.LogfilePath + "error.log").
-	//		setLevelEnabler(zapcore.ErrorLevel).
-	//		getCore()
-	//	cores = append(cores, fileInfoCore, fileErrorCore)
-	//case "dev":
-	//	//输出在控制台
-	//	consoleInfoCore := newZapConfig().
-	//		setEncoder(true, zapcore.NewConsoleEncoder).
-	//		setStdOutWriteSyncer().
-	//		setLevelEnabler(zapcore.DebugLevel).
-	//		getCore()
-	//	cores = append(cores, consoleInfoCore)
-	//default:
-	//默认开发模式
-	consoleInfoCore := newZapConfig().
-		setEncoder(true, zapcore.NewConsoleEncoder).
-		setStdOutWriteSyncer().
-		setLevelEnabler(zapcore.DebugLevel).
-		getCore()
-	cores = append(cores, consoleInfoCore)
+	switch config.App.Env {
+	case "pro":
+		//本开发模式旨在将正常信息及以上的log记录在文件中，方便查看
+		fileInfoCore := newZapConfig().
+			setEncoder(false, zapcore.NewConsoleEncoder).
+			setFileWriteSyncer(hglobal.Path + config.App.LogfilePath + "info.log").
+			setLevelEnabler(zapcore.DebugLevel).
+			getCore()
+		//本开发模式旨在将error及以上的log记录在文件中，方便查看
+		fileErrorCore := newZapConfig().
+			setEncoder(false, zapcore.NewConsoleEncoder).
+			setFileWriteSyncer(hglobal.Path + config.App.LogfilePath + "error.log").
+			setLevelEnabler(zapcore.ErrorLevel).
+			getCore()
+		cores = append(cores, fileInfoCore, fileErrorCore)
+	case "dev":
+		//输出在控制台
+		consoleInfoCore := newZapConfig().
+			setEncoder(true, zapcore.NewConsoleEncoder).
+			setStdOutWriteSyncer().
+			setLevelEnabler(zapcore.DebugLevel).
+			getCore()
+		cores = append(cores, consoleInfoCore)
+	default:
+		//默认开发模式
+		consoleInfoCore := newZapConfig().
+			setEncoder(true, zapcore.NewConsoleEncoder).
+			setStdOutWriteSyncer().
+			setLevelEnabler(zapcore.DebugLevel).
+			getCore()
+		cores = append(cores, consoleInfoCore)
 
-	//}
+	}
 	logger = zap.New(zapcore.NewTee(cores...), zap.AddCaller(), zap.AddCallerSkip(1))
 	defer logger.Sync()
 	return logger

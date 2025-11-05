@@ -3,7 +3,6 @@ module github.com/jhinih/hin
 go 1.24.2
 
 require (
-	github.com/aceld/zinx v1.2.7
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/cloudwego/eino v0.5.11

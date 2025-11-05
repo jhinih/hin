@@ -66,7 +66,6 @@ func NewClientConnection(client hinterface.IClient, conn net.Conn) *Connection {
 	c := &Connection{
 		Name:           client.GetName(),
 		Conn:           conn,
-		ConnID:         0,
 		isClosed:       false,
 		ExitChan:       make(chan bool, 1),
 		read2WriteChan: make(chan []byte, 1),
@@ -89,35 +88,39 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 
 	for {
-		head := make([]byte, c.Pack.GetHeadLen())
-		_, err := io.ReadFull(c.Conn, head)
-		if err != nil {
-			fmt.Println("read head err:", err)
-			break
-		}
-
-		msgHandler, err := c.Pack.UnPack(head)
-		if err != nil {
-			fmt.Println("unpack err:", err)
-			break
-		}
-
-		if msgHandler.GetDataLen() > 0 {
-			data := make([]byte, msgHandler.GetDataLen())
-			if _, err := io.ReadFull(c.Conn, data); err != nil {
-				fmt.Println("read data err:", err)
+		select {
+		case <-c.ExitChan:
+			return
+		default:
+			head := make([]byte, c.Pack.GetHeadLen())
+			_, err := io.ReadFull(c.Conn, head)
+			if err != nil {
+				fmt.Println("read head err:", err)
 				break
 			}
-			msgHandler.SetData(data)
-		}
-		request := NewRequest(c, msgHandler)
 
-		if 1 == 1 /*是否工作池*/ {
-			go c.MsgHandler.SendMsg2TaskQueue(request)
-		} else {
-			go c.MsgHandler.DoMessageHandler(request)
-		}
+			msgHandler, err := c.Pack.UnPack(head)
+			if err != nil {
+				fmt.Println("unpack err:", err)
+				break
+			}
 
+			if msgHandler.GetDataLen() > 0 {
+				data := make([]byte, msgHandler.GetDataLen())
+				if _, err := io.ReadFull(c.Conn, data); err != nil {
+					fmt.Println("read data err:", err)
+					break
+				}
+				msgHandler.SetData(data)
+			}
+			request := NewRequest(c, msgHandler)
+
+			if 1 == 1 /*是否工作池*/ {
+				go c.MsgHandler.SendMsg2TaskQueue(request)
+			} else {
+				go c.MsgHandler.DoMessageHandler(request)
+			}
+		}
 	}
 
 }
@@ -143,10 +146,10 @@ func (c *Connection) Start() {
 	fmt.Println("[connection", strconv.Itoa(int(c.ConnID)), "start]")
 	go c.StartReader()
 	go c.StartWriter()
-	c.ConnectionStartHook(c)
+	c.CallOnConnectionStart()
 }
 func (c *Connection) Stop() {
-	c.ConnectionStopHook(c)
+	c.CallOnConnectionStop()
 	c.ConnectionManager.Remove(c)
 	fmt.Println("[connection", strconv.Itoa(int(c.ConnID)), "stop]")
 	if c.isClosed == true {
@@ -177,6 +180,8 @@ func (c *Connection) Send(msgID uint32, data []byte) error {
 		return errors.New("connection " + strconv.Itoa(int(c.ConnID)) + " is closed")
 	}
 
+	fmt.Println("[client", strconv.Itoa(int(c.ConnID)), "send", msgID, "data:", string(data))
+
 	msg := hpack.NewMessage(msgID, data)
 	binaryMsg, err := c.Pack.Pack(msg)
 	if err != nil {
@@ -194,14 +199,14 @@ func (c *Connection) SetProperty(key string, value interface{}) {
 	c.property[key] = value
 
 }
-func (c *Connection) GetProperty(key string) (interface{}, error) {
+func (c *Connection) GetProperty(key string) interface{} {
 	c.propertyLock.RLock()
 	defer c.propertyLock.RUnlock()
 
 	if value, ok := c.property[key]; ok {
-		return value, nil
+		return value
 	} else {
-		return nil, errors.New("property not found")
+		return errors.New("property not exist")
 	}
 }
 func (c *Connection) RemoveProperty(key string) {
@@ -209,4 +214,17 @@ func (c *Connection) RemoveProperty(key string) {
 	defer c.propertyLock.Unlock()
 
 	delete(c.property, key)
+}
+func (c *Connection) CallOnConnectionStart() {
+	if c.ConnectionStartHook != nil {
+		fmt.Println("HIN CallOnConnectionStart....")
+		c.ConnectionStartHook(c)
+	}
+}
+
+func (c *Connection) CallOnConnectionStop() {
+	if c.ConnectionStartHook != nil {
+		fmt.Println("HIN CallOnConnectionStop....")
+		c.ConnectionStopHook(c)
+	}
 }

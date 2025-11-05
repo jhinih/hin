@@ -16,6 +16,6 @@ type IConnection interface {
 	Send(uint32, []byte) error
 
 	SetProperty(key string, value interface{})
-	GetProperty(key string) (interface{}, error)
+	GetProperty(key string) interface{}
 	RemoveProperty(key string)
 }

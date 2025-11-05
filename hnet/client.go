@@ -3,6 +3,7 @@ package hnet
 import (
 	"context"
 	"fmt"
+	"github.com/jhinih/hin/hinitialize"
 	"sync"
 
 	"github.com/jhinih/hin/hinterface"
@@ -35,13 +36,14 @@ type Client struct {
 }
 
 func NewClient(ip string, port int, opts ...ClientOption) hinterface.IClient {
+	hinitialize.Init()
 	c := &Client{
 		Name:       "HinClient",
 		IP:         ip,
 		Port:       port,
 		IPVersion:  "tcp4",
 		MsgHandler: NewClientMessageHandler(),
-		Pack:       hpack.NewLTVPack(),
+		Pack:       hpack.NewTLVPack(),
 		errChan:    make(chan error, 1),
 	}
 	for _, opt := range opts {
@@ -68,6 +70,7 @@ func (c *Client) ReStart() {
 	c.Add(1)
 	c.Unlock()
 	go func() {
+		c.MsgHandler.StartWorkPoll()
 		defer c.Done()
 		d := &net.Dialer{}
 		conn, err := d.DialContext(c.ctx, "tcp", fmt.Sprintf("%v:%v", net.ParseIP(c.IP), c.Port))
@@ -80,20 +83,13 @@ func (c *Client) ReStart() {
 		c.SetConnection(connection)
 
 		go connection.Start()
-		fmt.Println("2")
-
 		<-c.ctx.Done()
-		fmt.Println("3")
-
 	}()
-	fmt.Println("1")
 	select {
-	case err := <-c.errChan:
+	case _ = <-c.errChan:
 		c.Lock()
 		c.started = false
 		c.Unlock()
-		c.notifyErr(err)
-
 	}
 
 }
@@ -113,6 +109,7 @@ func (c *Client) Stop() {
 	if connection != nil {
 		fmt.Println("[Client stop]")
 		connection.Stop()
+		hinitialize.Eve()
 	}
 
 	if c.cancel != nil {
