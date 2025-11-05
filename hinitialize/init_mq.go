@@ -1,4 +1,4 @@
-package initialize
+package hinitialize
 
 import (
 	"github.com/jhinih/hin/hconfig"

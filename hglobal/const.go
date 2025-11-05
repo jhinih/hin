@@ -6,7 +6,7 @@ import (
 
 // 所有常量文件读取位置
 const (
-	DEFAULT_CONFIG_FILE_PATH = "/config/config.yaml"
+	DEFAULT_CONFIG_FILE_PATH = "\\config\\config.yaml"
 	TMPDIR                   = "./tmp_upload"
 	ATOKEN_EFFECTIVE_TIME    = time.Hour * 2
 

@@ -57,7 +57,6 @@ func (m *MessageHandler) StartWorker(workerID int, taskChan chan hinterface.IReq
 	for {
 		select {
 		case request := <-taskChan:
-
 			m.DoMessageHandler(request)
 		}
 	}

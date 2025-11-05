@@ -1,4 +1,4 @@
-package initialize
+package hinitialize
 
 import (
 	"flag"
@@ -19,7 +19,7 @@ func InitConfig() {
 	var configPath string
 	flag.StringVar(&configPath, "c", hglobal.Path+hglobal.DEFAULT_CONFIG_FILE_PATH, "配置文件绝对路径或相对路径")
 	flag.Parse()
-	configPath = "./config/config.yaml"
+	//configPath = "./config/config.yaml"
 	fmt.Printf("配置文件路径为 %s\n", configPath)
 	// 初始化配置文件
 	viper.SetConfigFile(configPath)
