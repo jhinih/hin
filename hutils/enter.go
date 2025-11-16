@@ -16,7 +16,7 @@ import (
 GetRootPath 搜索项目的文件根目录, 并和 myPath 拼接起来
 */
 func GetRootPath(myPath string) string {
-	_, fileName, _, ok := runtime.Caller(1)
+	_, fileName, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("Something wrong with getting root path")
 	}
@@ -109,8 +109,8 @@ func RecordTime(start time.Time) func() {
 // Ordered 可比较的类型
 type Ordered interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
-		~float32 | ~float64 | ~string
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+	~float32 | ~float64 | ~string
 }
 
 // Max 泛型函数，返回最大值
