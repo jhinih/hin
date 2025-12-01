@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -17,7 +18,7 @@ type Server struct {
 	Port int
 
 	IPVersion         string
-	MsgHandler        hinterface.IMessageHandler
+	MessageHandler    hinterface.IMessageHandler
 	ConnectionManager hinterface.IConnectionManager
 
 	exitChan            chan any
@@ -35,7 +36,7 @@ func NewServer() hinterface.IServer {
 		IP:        "0.0.0.0",
 		Port:      8999,
 
-		MsgHandler:        NewServerMessageHandler(),
+		MessageHandler:    NewServerMessageHandler(),
 		ConnectionManager: NewServerConnectionManager(),
 
 		Pack: hpack.NewTLVPack(),
@@ -55,7 +56,7 @@ func (s *Server) Start() {
 	}
 	cid := uint32(0)
 	go func() {
-		s.MsgHandler.StartWorkPoll()
+		s.MessageHandler.StartWorkPoll()
 		for {
 			conn, err := listener.AcceptTCP()
 			if err != nil {
@@ -66,7 +67,7 @@ func (s *Server) Start() {
 				conn.Close()
 				continue
 			}
-			dealConn := NewServerConnection(s, conn, cid, s.MsgHandler)
+			dealConn := NewServerConnection(s, conn, cid, s.MessageHandler)
 			cid++
 
 			go dealConn.Start()
@@ -100,7 +101,7 @@ func (s *Server) Serve() {
 }
 
 func (s *Server) AddRouter(msgID uint32, router hinterface.IRouter) {
-	s.MsgHandler.AddRouter(msgID, router)
+	s.MessageHandler.AddRouter(msgID, router)
 }
 
 func (s *Server) SetConnectionStartHook(fn func(hinterface.IConnection)) {
@@ -122,7 +123,7 @@ func (s *Server) GetConnectionStopHook() func(hinterface.IConnection) {
 	return s.ConnectionStopHook
 }
 func (s *Server) GetMsgHandler() hinterface.IMessageHandler {
-	return s.MsgHandler
+	return s.MessageHandler
 }
 func (s *Server) GetConnectionManager() hinterface.IConnectionManager {
 	return s.ConnectionManager
@@ -130,5 +131,32 @@ func (s *Server) GetConnectionManager() hinterface.IConnectionManager {
 func (s *Server) GetName() string {
 	return s.Name
 }
+func (s *Server) GetServerID() uint64 {
+	var b []byte
+	for _, seg := range strings.Split(s.IP, ".") {
+		b = append(b, fmt.Sprintf("%03s", seg)...)
+	}
+	b = append(b, fmt.Sprintf("%05d", s.Port)...)
+	var ServerID uint64
+	fmt.Sscanf(string(b), "%d", &ServerID)
+	return ServerID
+}
+
+// // 将 12700000000108080 还原成 ip、port
+//	func IDToIPPort(id uint64) (ip string, port int) {
+//		// 取后 5 位 = 端口
+//		port = int(id % 100000)
+//		id /= 100000
+//
+//		// 从低位到高位依次取 3 位
+//		segs := make([]string, 4)
+//		for i := 3; i >= 0; i-- {
+//			segs[i] = fmt.Sprintf("%03d", id%1000)
+//			id /= 1000
+//		}
+//
+//		ip = fmt.Sprintf("%s.%s.%s.%s", segs[0], segs[1], segs[2], segs[3])
+//		return ip, port
+//	}
 
 func init() {}

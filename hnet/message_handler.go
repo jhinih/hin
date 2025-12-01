@@ -13,6 +13,13 @@ type MessageHandler struct {
 	TaskChan     []chan hinterface.IRequest
 }
 
+func NewMessageHandler() *MessageHandler {
+	return &MessageHandler{
+		APIs:         make(map[uint32]hinterface.IRouter),
+		WorkPollSize: 10,
+		TaskChan:     make([]chan hinterface.IRequest, 1024),
+	}
+}
 func NewServerMessageHandler() *MessageHandler {
 	return &MessageHandler{
 		APIs:         make(map[uint32]hinterface.IRouter),

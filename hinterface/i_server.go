@@ -5,6 +5,7 @@ type IServer interface {
 	Stop()
 	Serve()
 	GetName() string
+	GetServerID() uint64
 
 	AddRouter(uint32, IRouter)
 

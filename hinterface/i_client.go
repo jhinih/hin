@@ -5,8 +5,10 @@ type IClient interface {
 	ReStart()
 	Stop()
 	AddRouter(uint32, IRouter)
+	GetClientID() uint64
 
-	GetConnection() IConnection
+	GetConnection(uint32) (IConnection, error)
+	AddConnection(IConnection)
 
 	SetConnectionStartHook(func(IConnection))
 	SetConnectionStopHook(func(IConnection))

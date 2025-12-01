@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/jhinih/hin/hinitialize"
+	"strings"
 	"sync"
 
 	"github.com/jhinih/hin/hinterface"
@@ -22,14 +23,15 @@ type Client struct {
 	IP   string
 	Port int
 
-	IPVersion  string
-	MsgHandler hinterface.IMessageHandler
+	IPVersion         string
+	MessageHandler    hinterface.IMessageHandler
+	ConnectionManager hinterface.IConnectionManager
 
+	exitChan            chan any
 	ConnectionStartHook func(hinterface.IConnection)
 	ConnectionStopHook  func(hinterface.IConnection)
 
 	Pack          hinterface.IPack
-	connection    hinterface.IConnection
 	connectionMux sync.Mutex
 
 	errChan chan error
@@ -38,13 +40,17 @@ type Client struct {
 func NewClient(ip string, port int, opts ...ClientOption) hinterface.IClient {
 	hinitialize.Init()
 	c := &Client{
-		Name:       "HinClient",
-		IP:         ip,
-		Port:       port,
-		IPVersion:  "tcp4",
-		MsgHandler: NewClientMessageHandler(),
-		Pack:       hpack.NewTLVPack(),
-		errChan:    make(chan error, 1),
+		Name:      "HinClient",
+		IPVersion: "tcp4",
+		IP:        ip,
+		Port:      port,
+
+		MessageHandler:    NewClientMessageHandler(),
+		ConnectionManager: NewClientConnectionManager(),
+
+		exitChan: make(chan any),
+		Pack:     hpack.NewTLVPack(),
+		errChan:  make(chan error, 1),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -70,7 +76,7 @@ func (c *Client) ReStart() {
 	c.Add(1)
 	c.Unlock()
 	go func() {
-		c.MsgHandler.StartWorkPoll()
+		c.MessageHandler.StartWorkPoll()
 		defer c.Done()
 		d := &net.Dialer{}
 		conn, err := d.DialContext(c.ctx, "tcp", fmt.Sprintf("%v:%v", net.ParseIP(c.IP), c.Port))
@@ -80,7 +86,7 @@ func (c *Client) ReStart() {
 			return
 		}
 		connection := NewClientConnection(c, conn)
-		c.SetConnection(connection)
+		c.AddConnection(connection)
 
 		go connection.Start()
 		<-c.ctx.Done()
@@ -105,20 +111,16 @@ func (c *Client) Stop() {
 	}
 	c.started = false
 
-	connection := c.GetConnection()
-	if connection != nil {
-		fmt.Println("[Client stop]")
-		connection.Stop()
-		hinitialize.Eve()
-	}
+	c.ConnectionManager.ClearConnection()
+	hinitialize.Eve()
 
 	if c.cancel != nil {
 		c.cancel()
 	}
 	c.Wait()
 }
-func (c *Client) AddRouter(msgID uint32, router hinterface.IRouter) {
-	c.MsgHandler.AddRouter(msgID, router)
+func (c *Client) AddRouter(messageID uint32, router hinterface.IRouter) {
+	c.MessageHandler.AddRouter(messageID, router)
 }
 
 func (c *Client) SetConnectionStartHook(fn func(hinterface.IConnection)) {
@@ -140,17 +142,19 @@ func (c *Client) GetConnectionStopHook() func(hinterface.IConnection) {
 	return c.ConnectionStopHook
 }
 func (c *Client) GetMsgHandler() hinterface.IMessageHandler {
-	return c.MsgHandler
+	return c.MessageHandler
 }
-func (c *Client) GetConnection() hinterface.IConnection {
+func (c *Client) GetConnection(connectionID uint32) (hinterface.IConnection, error) {
 	c.connectionMux.Lock()
 	defer c.connectionMux.Unlock()
-	return c.connection
+	connection, err := c.ConnectionManager.Get(connectionID)
+	return connection, err
+
 }
-func (c *Client) SetConnection(connection hinterface.IConnection) {
+func (c *Client) AddConnection(connection hinterface.IConnection) {
 	c.connectionMux.Lock()
 	defer c.connectionMux.Unlock()
-	c.connection = connection
+	c.ConnectionManager.Add(connection)
 }
 
 func (c *Client) SetName(name string) {
@@ -162,6 +166,34 @@ func (c *Client) GetName() string {
 func (c *Client) GetErrChan() <-chan error {
 	return c.errChan
 }
+
+func (c *Client) GetClientID() uint64 {
+	var b []byte
+	for _, seg := range strings.Split(c.IP, ".") {
+		b = append(b, fmt.Sprintf("%03s", seg)...)
+	}
+	b = append(b, fmt.Sprintf("%05d", c.Port)...)
+	var ClientID uint64
+	fmt.Sscanf(string(b), "%d", &ClientID)
+	return ClientID
+}
+
+// // 将 12700000000108080 还原成 ip、port
+//	func IDToIPPort(id uint64) (ip string, port int) {
+//		// 取后 5 位 = 端口
+//		port = int(id % 100000)
+//		id /= 100000
+//
+//		// 从低位到高位依次取 3 位
+//		segs := make([]string, 4)
+//		for i := 3; i >= 0; i-- {
+//			segs[i] = fmt.Sprintf("%03d", id%1000)
+//			id /= 1000
+//		}
+//
+//		ip = fmt.Sprintf("%s.%s.%s.%s", segs[0], segs[1], segs[2], segs[3])
+//		return ip, port
+//	}
 
 //func (c *Client) SetUrl(url *url.URL) {
 //	c.Url = url
